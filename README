@@ -1,0 +1,26 @@
+cudas
+=====
+
+Rust bindings for the CUDA Driver API and NVRTC.
+
+Three abstraction layers:
+
+  sys     - raw FFI bindings (bindgen)
+  result  - safe wrappers returning Result
+  borrow  - RAII types with lifetime safety
+
+
+Requirements
+------------
+
+  - NVIDIA GPU with CUDA support
+  - CUDA Toolkit
+  - Rust (edition 2021)
+
+
+Building
+--------
+
+  $ cargo build
+
+Set CUDA_PATH if CUDA is not in a standard location.
