@@ -45,5 +45,15 @@ pub mod device {
         Ok(dev)
     }
 
+    pub unsafe fn primary_ctx_retain(dev: sys::CUdevice) -> Result<sys::CUcontext, CudaError> {
+        let mut ctx = MaybeUninit::uninit();
+        sys::cuDevicePrimaryCtxRetain(ctx.as_mut_ptr(), dev).result()?;
+        Ok(ctx.assume_init())
+    }
+
+    pub unsafe fn primary_ctx_release(dev: sys::CUdevice) -> Result<(), CudaError> {
+        sys::cuDevicePrimaryCtxRelease_v2(dev).result()
+    }
+
 }
 
