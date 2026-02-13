@@ -1,0 +1,49 @@
+use std::{
+    ffi::{c_uint, c_void},
+    mem::{size_of, MaybeUninit},
+};
+
+use super::sys;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CudaError(sys::CUresult); //tuple struct with one field accessed as self.0
+
+impl sys::CUresult {
+    pub fn result(self) -> Result<(), CudaError> {
+        match self {
+            sys::CUresult::CUDA_SUCCESS => Ok(()),
+            _ => Err(CudaError(self)),
+        }
+    }
+}
+
+impl std::fmt::Display for CudaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self))
+    }
+}
+
+impl std::error::Error for CudaError {}
+
+pub fn init() -> Result<(), CudaError> {
+    unsafe { sys::cuInit(0).result() }
+}
+
+//this core pattern will be used everywhere. CUresult is the C enum type returned by
+//every CUDA call. We add a .result() method directly on it that converts CUDA_SUCCESS -> Ok(())
+//anything else -> Err(CudaError(...)). The CudaError newtype wraps the raw enum so we can
+//implement Display and Error on it.
+
+pub mod device {
+    use super::{sys, CudaError};
+    use std::mem::MaybeUninit;
+
+    pub fn get(ordinal: std::ffi::c_int) -> Result<sys::CUdevice, CudaError> {
+        let mut dev: sys::CUdevice = 0;
+        unsafe {sys::cuDeviceGet((&mut dev) as *mut sys::CUdevice, ordinal).result()? }
+        //&mut dev is a rust reference its not a raw C pointer. we need to cast it to a raw C pointer
+        Ok(dev)
+    }
+
+}
+
