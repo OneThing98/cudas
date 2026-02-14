@@ -57,3 +57,38 @@ pub mod device {
 
 }
 
+pub mod ctx {
+    use super::{sys, CudaError};
+
+    pub unsafe fn set_current(ctx: sys::CUcontext) -> Result<(), CudaError> {
+        sys::cuCtxSetCurrent(ctx).result()
+    }
+}
+
+
+pub mod stream {
+    use super::{sys, CudaError};
+    use std::mem::MaybeUninit;
+
+    pub use sys::CUstream_flags;
+
+    pub fn null() -> sys::CUstream {
+        std::ptr::null_mut()
+    }
+
+    pub fn create(flags: CUstream_flags) -> Result<sys::CUstream, CudaError> {
+        let mut stream = MaybeUninit::uninit();
+        unsafe {
+            sys::cuStreamCreate(stream.as_mut_ptr(), flags as u32).result()?;
+            Ok(stream.assume_init())
+        }
+    }
+
+    pub unsafe fn synchronize(stream: sys::CUstream) -> Result<(), CudaError> {
+        sys::cuStreamSynchronize(stream).result()
+    }
+
+    pub unsafe fn destroy(stream: sys::CUstream) -> Result<(), CudaError> {
+        sys::cuStreamDestroy_v2(stream).result()
+    }
+}
