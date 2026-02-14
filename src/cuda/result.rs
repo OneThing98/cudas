@@ -92,3 +92,73 @@ pub mod stream {
         sys::cuStreamDestroy_v2(stream).result()
     }
 }
+
+
+
+//memory allocation and transfer
+pub unsafe fn malloc<T>() -> Result<sys::CUdeviceptr, CudaError> {
+    let bytesize = size_of::<T>();
+    let mut dev_ptr = MaybeUninit::uninit();
+    unsafe {
+        sys::cuMemAlloc_v2(dev_ptr.as_mut_ptr(), bytesize).result()?;
+        Ok(dev_ptr.assume_init())
+    }
+}
+
+pub unsafe fn malloc_async<T>(stream: sys::CUstream) -> Result<sys::CUdeviceptr, CudaError> {
+    let bytesize = size_of::<T>();
+    let mut dev_ptr = MaybeUninit::uninit();
+    unsafe {
+        sys::cuMemAllocAsync(dev_ptr.as_mut_ptr(), bytesize, stream).result()?;
+        Ok(dev_ptr.assume_init())
+    }
+}
+
+pub unsafe fn free(dptr: sys::CUdeviceptr) -> Result<(), CudaError> {
+    sys::cuMemFree_v2(dptr).result()
+}
+
+pub unsafe fn free_async (dptr: sys::CUdeviceptr, stream: sys::CUstream) -> Result<(), CudaError> {
+    sys::cuMemFreeAsync(dptr, stream).result()
+}
+
+
+//Memset
+
+pub unsafe fn memset_d8<T>(dptr: sys::CUdeviceptr, uc: std::ffi::c_uchar) -> Result<(), CudaError> {
+    sys::cuMemsetD8_v2(dptr, uc, size_of::<T>()).result()
+}
+
+pub unsafe fn memset_d8_async<T>(
+    dptr: sys::CUdeviceptr, 
+    uc: std::ffi::c_uchar,
+    stream: sys::CUstream,
+) -> Result<(), CudaError> {
+    sys::cuMemsetD8Async(dptr, uc, size_of::<T>(), stream).result()
+}
+
+//host <-> device memory copy
+pub unsafe fn memcpy_htod<T>(dst: sys::CUdeviceptr, src: &T) -> Result<(), CudaError> {
+    sys::cuMemcpyHtoD_v2(dst, src as *const T as *const _, size_of::<T>()).result()
+    //from rust reference to raw c pointer. from raw c pointer to generic void pointer. void pointer in c refers to "any type of data"
+}
+
+pub unsafe fn memcpy_htod_async<T>(
+    dst: sys::CUdeviceptr,
+    src: &T,
+    stream: sys::CUstream,
+) -> Result<(), CudaError> {
+    sys::cuMemcpyHtoDAsync_v2(dst, src as *const T as *const _, size_of::<T>(), stream).result()
+}
+
+pub unsafe fn memcpy_dtoh<T>(dst: &mut T, src: sys::CUdeviceptr) -> Result<(), CudaError> {
+    sys::cuMemcpyDtoH_v2(dst as *mut T as *mut _, src, size_of::<T>()).result()
+}
+
+pub unsafe fn memcpy_dtoh_async<T>(
+    dst: &mut T,
+    src: sys::CUdeviceptr,
+    stream: sys::CUstream,
+) -> Result<(), CudaError> {
+    sys::cuMemcpyDtoHAsync_v2(dst as *mut T as *mut _, src, size_of::<T>(), stream).result()
+}
