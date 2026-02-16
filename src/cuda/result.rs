@@ -203,4 +203,29 @@ pub mod module {
     pub unsafe fn unload(module: sys::CUmodule) -> Result<(), CudaError> {
         unsafe { sys::cuModuleUnload(module).result() }
     }
+
 }
+
+pub unsafe fn launch_kernel (
+        f: sys::CUfunction,
+        grid_dim: (c_uint, c_uint, c_uint),
+        block_dim: (c_uint, c_uint, c_uint),
+        shared_mem_bytes: c_uint,
+        stream: sys::CUstream,
+        kerenel_params: &mut [*mut c_void]
+    ) -> Result<(), CudaError> {
+        sys::cuLaunchKernel(
+            f,
+            grid_dim.0,
+            grid_dim.1,
+            grid_dim.2,
+            block_dim.0,
+            block_dim.1,
+            block_dim.2,
+            shared_mem_bytes,
+            stream,
+            kerenel_params.as_mut_ptr(),
+            std::ptr::null_mut(),
+        )
+        .result()
+    }
