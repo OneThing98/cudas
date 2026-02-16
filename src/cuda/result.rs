@@ -162,3 +162,45 @@ pub unsafe fn memcpy_dtoh_async<T>(
 ) -> Result<(), CudaError> {
     sys::cuMemcpyDtoHAsync_v2(dst as *mut T as *mut _, src, size_of::<T>(), stream).result()
 }
+
+//module loading
+
+pub mod module {
+    use super::{sys, CudaError};
+    use std::{ffi::CString, mem::MaybeUninit};
+
+    pub fn load<S: AsRef<str>>(fname: S) -> Result<sys::CUmodule, CudaError> {
+        //&CStr expects data to be null terminated, but rust strings arent
+        //CString deos that for us thats why its needed.
+        let fname_cstr = CString::new(fname.as_ref()).unwrap();
+        let fname_ptr = fname_cstr.as_c_str().as_ptr();
+        let mut module = MaybeUninit::uninit();
+        unsafe {
+            sys::cuModuleLoad(module.as_mut_ptr(), fname_ptr).result()?;
+            Ok(module.assume_init())
+        }
+    }
+
+    pub unsafe fn load_data(image: *const std::ffi::c_void) -> Result<sys::CUmodule, CudaError> {
+        let mut module = MaybeUninit::uninit();
+        sys::cuModuleLoadData(module.as_mut_ptr(), image).result()?;
+        Ok(module.assume_init())
+    }
+
+    pub unsafe fn get_functions<S: AsRef<str>>(
+        module: sys::CUmodule,
+        name: S,
+    ) -> Result<sys::CUfunction, CudaError> {
+        let name_cstr = CString::new(name.as_ref()).unwrap();
+        let name_ptr = name_cstr.as_c_str().as_ptr();
+        let mut func = MaybeUninit::uninit();
+        unsafe {
+            sys::cuModuleGetFunction(func.as_mut_ptr(), module, name_ptr).result()?;
+            Ok(func.assume_init())
+        }
+    }
+
+    pub unsafe fn unload(module: sys::CUmodule) -> Result<(), CudaError> {
+        unsafe { sys::cuModuleUnload(module).result() }
+    }
+}
