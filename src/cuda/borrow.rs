@@ -53,3 +53,54 @@ impl Drop for CudaDevice {
         }
     }
 }
+
+impl CudaDevice {
+    pub fn new(ordinal: usize) -> Result<Self, result::CudaError> {
+        result::init()?;
+        let cu_device = result::device::get(ordinal as i32)?;
+        let cu_primary_ctx = unsafe { result::device::primary_ctx_retain(cu_device)}?;
+        unsafe { result::ctx::set_current(cu_primary_ctx) }?;
+        let cu_stream = result::stream::create(result::stream::CUstream_flags::CU_STREAM_NON_BLOCKING)?;
+        Ok(Self{
+            cu_device,
+            cu_primary_ctx,
+            cu_stream,
+            loaded_modules: HashMap::new(),
+        })
+    }
+
+    //unsafe because it memsets all allocated memory to 0, and T may not be valid.
+    pub unsafe fn alloc<T>(&self) -> Result<InCudaMemory<T>, result::CudaError> {
+        let cu_device_ptr = unsafe {
+            result::malloc_async::<T>(self.cu_stream)
+        }?;
+        unsafe {
+            result::memset_d8_async::<T>(cu_device_ptr, 0, self.cu_stream)
+        }?;
+        Ok(InCudaMemory {
+            cu_device_ptr,
+            host_data: None,
+            device: PhantomData,
+        })
+    }
+
+    //the net effect is: data starts on the CPU heap, gets copied to GPU memory, then the CPU copy is freed. The GPU now has the only copy. 
+    pub fn take<T>(&self, host_data: Box<T>) -> Result<InCudaMemory<T>, result::CudaError> {
+        let cu_device_ptr = unsafe {
+            result::malloc_async::<T>(self.cu_stream)
+        }?;
+        unsafe { result::memcpy_htod_async(cu_device_ptr, host_data.as_ref(), self.cu_stream) }?;
+        Ok(InCudaMemory {
+            cu_device_ptr,
+            host_data: Some(host_data),
+            device: PhantomData,
+        })
+    }
+
+    //unsafe because of the same reason with T not being valid.
+    pub fn release<T>(&self, t: InCudaMemory<T>) -> Result<Box<T>, result::CudaError> {
+        
+    }
+
+
+}
