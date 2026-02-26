@@ -99,7 +99,21 @@ impl CudaDevice {
 
     //unsafe because of the same reason with T not being valid.
     pub fn release<T>(&self, t: InCudaMemory<T>) -> Result<Box<T>, result::CudaError> {
-        
+        let mut host_data = t.host_data.unwrap_or_else(|| {
+            let layout = Layout::new::<T>();
+            unsafe {
+                let ptr = alloc_zeroed(layout) as *mut T;
+                Box::from_raw(ptr)
+            }
+        });
+        unsafe { result::memcpy_dtoh_async(host_data.as_mut(), t.cu_device_ptr, self.cu_stream) }?;
+        self.synchronize()?;
+        unsafe { result::free_async(t.cu_device_ptr, self.cu_stream) }?;
+        Ok(host_data)
+    }
+
+    pub fn synchronize(&self) -> Result<(), result::CudaError> {
+        unsafe { result::stream::synchronize(self.cu_stream) }
     }
 
 
