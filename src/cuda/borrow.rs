@@ -116,5 +116,55 @@ impl CudaDevice {
         unsafe { result::stream::synchronize(self.cu_stream) }
     }
 
+    pub fn has_module(&self, key: &'static str) -> bool {
+        self.loaded_modules.contains_key(key)
+    }
 
+    pub fn load_module_from_ptx_file(
+        &mut self,
+        key: &'static str,
+        fname: &'static str,
+    ) -> Result<&mut CudaModule, result::CudaError> {
+        let cu_module = result::module::load(fname)?;
+        self.insert_module(key, cu_module);
+        Ok(self.loaded_modules.get_mut(key).unwrap())
+    }
+
+    pub unsafe fn load_module_from_ptx_nvrtc(
+        &mut self,
+        key: &'static str,
+        image: *const std::ffi::c_char,
+    ) -> Result<&mut CudaModule, result::CudaError> {
+        let cu_module = result::module::load_data(image as *const _)?;
+        self.insert_module(key, cu_module);
+        Ok(self.loaded_modules.get_mut(key).unwrap())
+    }
+
+    fn insert_module(&mut self, key: &'static str, cu_module: sys::CUmodule) {
+        self.loaded_modules.insert(
+            key,
+            CudaModule {
+                cu_module,
+                functions: HashMap::with_capacity(1),
+            },
+        );
+    }
+
+    pub fn get_module(&self, fname: &str) -> Option<&CudaModule> {
+        self.loaded_modules.get(fname)
+    }
+
+
+}
+
+impl CudaModule {
+    pub fn load_fn(&mut self, name: &'static str) -> Result<(), result::CudaError> {
+        let cu_function = unsafe { result::module::get_function(self.cu_module, name) }?;
+        self.functions.insert(name, CudaFunction { cu_function });
+        Ok(())
+    }
+
+    pub fn get_fn(&self, name: &str) -> Option<&CudaFunction> {
+        self.functions.get(name)
+    }
 }
